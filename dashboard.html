@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXORA 3.0 — Mission Control Fleet</title>
+<style>
+  :root {
+    --bg-dark: #090a0d;
+    --card-bg: #12141a;
+    --card-border: #1f232d;
+    --text-primary: #f1f3f7;
+    --text-muted: #8b949e;
+    --accent: #d4a359;
+    --accent-glow: rgba(212, 163, 89, 0.15);
+    --green: #10b981;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  /* Sidebar */
+  aside {
+    width: 240px;
+    background: #0d0f14;
+    border-right: 1px solid var(--card-border);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 16px;
+    flex-shrink: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 30px;
+    letter-spacing: 0.5px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    color: var(--text-muted);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin-bottom: 4px;
+  }
+  .nav-item:hover, .nav-item.active {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--card-border);
+  }
+  .nav-item.active {
+    color: var(--accent);
+    border-color: rgba(212, 163, 89, 0.3);
+  }
+  .fleet-badge {
+    margin-top: auto;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 12px;
+  }
+  .fleet-badge .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  /* Main Content */
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow-y: auto;
+    background: radial-gradient(circle at top right, rgba(212, 163, 89, 0.04) 0%, transparent 60%);
+  }
+  header {
+    height: 64px;
+    border-bottom: 1px solid var(--card-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    background: rgba(9, 10, 13, 0.7);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-title { font-size: 18px; font-weight: 600; }
+  .header-actions { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn-outline {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--card-border);
+  }
+  .btn-outline:hover { background: var(--card-bg); }
+  
+  .view-container {
+    padding: 32px;
+    flex: 1;
+    display: none;
+  }
+  .view-container.active { display: block; }
+
+  /* Cards Grid */
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 24px; }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .agent-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+  .agent-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: var(--accent);
+  }
+  .agent-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .agent-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: #1e222d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: var(--accent);
+    border: 1px solid var(--card-border);
+    font-size: 16px;
+  }
+  .agent-role { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .agent-name { font-size: 16px; font-weight: 600; }
+  .agent-stats {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* Kanban */
+  .kanban-board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+  .kanban-col {
+    background: #0f1117;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 16px;
+    min-height: 450px;
+  }
+  .col-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .mission-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+    cursor: grab;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .mission-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(212, 163, 89, 0.4);
+  }
+  .mission-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .mission-desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 10px; }
+  .mission-meta { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+  .tag { background: #1c202a; padding: 2px 8px; border-radius: 4px; color: var(--accent); }
+
+  /* Chat */
+  .chat-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 20px;
+    height: calc(100vh - 128px);
+  }
+  .chat-agents-list {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    overflow-y: auto;
+  }
+  .chat-agent-item {
+    padding: 14px;
+    border-bottom: 1px solid var(--card-border);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .chat-agent-item.selected, .chat-agent-item:hover {
+    background: #181c25;
+  }
+  .chat-main {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .bubble {
+    max-width: 75%;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .bubble.user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #000;
+    font-weight: 500;
+  }
+  .bubble.agent {
+    align-self: flex-start;
+    background: #191d26;
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+  }
+  .chat-input-area {
+    padding: 16px;
+    border-top: 1px solid var(--card-border);
+    display: flex;
+    gap: 12px;
+  }
+  .chat-input {
+    flex: 1;
+    background: #0a0c10;
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+    padding: 12px 16px;
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+  }
+  .chat-input:focus { border-color: var(--accent); }
+
+  /* Terminal */
+  .terminal-box {
+    background: #07080a;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    height: calc(100vh - 128px);
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-mono);
+  }
+  .terminal-output {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    font-size: 13px;
+    color: #10b981;
+    white-space: pre-wrap;
+  }
+  .terminal-input-bar {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-top: 1px solid var(--card-border);
+    background: #0c0d12;
+  }
+  .terminal-prompt { color: var(--accent); margin-right: 10px; font-weight: bold; }
+  .terminal-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  /* Docs */
+  .docs-list { display: flex; flex-direction: column; gap: 10px; }
+  .doc-item {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    padding: 16px 20px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+  }
+  .doc-item:hover { border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside>
+  <div class="brand">
+    <span>☤ NEXORA</span>
+    <span style="font-size: 10px; background: var(--accent); color: #000; padding: 2px 6px; border-radius: 4px;">3.0</span>
+  </div>
+  <div class="nav-item active" onclick="switchView('cockpit')">⚡ Cockpit</div>
+  <div class="nav-item" onclick="switchView('missions')">📋 Missões</div>
+  <div class="nav-item" onclick="switchView('chat')">💬 Chat Frota</div>
+  <div class="nav-item" onclick="switchView('docs')">📁 Documentos</div>
+  <div class="nav-item" onclick="switchView('terminal')">💻 Terminal Shell</div>
+
+  <div class="fleet-badge">
+    <div style="font-weight: 600; margin-bottom: 4px;"><span class="dot"></span>Frota Conectada</div>
+    <div style="color: var(--text-muted);">Hermes • free.vendoideias</div>
+  </div>
+</aside>
+
+<!-- Main Area -->
+<main>
+  <header>
+    <div class="header-title" id="page-title">Cockpit da Frota</div>
+    <div class="header-actions">
+      <button class="btn btn-outline" onclick="loadAllData()">Atualizar</button>
+      <button class="btn" onclick="openNewMissionModal()">+ Nova Missão</button>
+    </div>
+  </header>
+
+  <!-- VIEW 1: COCKPIT -->
+  <div class="view-container active" id="view-cockpit">
+    <div class="grid-2" id="agents-grid">
+      <!-- Cards de Agentes carregados dinamicamente -->
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="font-size: 15px; margin-bottom: 12px; color: var(--accent);">Saúde do Servidor</h3>
+        <div id="health-stats" style="font-size: 13px; color: var(--text-muted); line-height: 1.8;">Carregando...</div>
+      </div>
+      <div class="card">
+        <h3 style="font-size: 15px; margin-bottom: 12px; color: var(--accent);">Regras de Operação</h3>
+        <div style="font-size: 13px; color: var(--text-muted); line-height: 1.8;">
+          • FreeLLM Provider: <code>https://free.vendoideias.com/v1</code><br>
+          • Modelo travado em: <code>auto</code><br>
+          • Isolamento: <code>~/.hermes</code> (Modo seguro)<br>
+          • Autonomia: Nenhuma ação externa roda sem aprovação.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 2: MISSÕES (KANBAN) -->
+  <div class="view-container" id="view-missions">
+    <div class="kanban-board">
+      <div class="kanban-col" id="col-backlog">
+        <div class="col-title">Backlog <span class="tag" id="cnt-backlog">0</span></div>
+        <div class="cards-list"></div>
+      </div>
+      <div class="kanban-col" id="col-approval_needed">
+        <div class="col-title" style="color: #f59e0b;">Aguardando Aprovação <span class="tag" id="cnt-approval">0</span></div>
+        <div class="cards-list"></div>
+      </div>
+      <div class="kanban-col" id="col-in_progress">
+        <div class="col-title" style="color: var(--blue);">Em Execução <span class="tag" id="cnt-progress">0</span></div>
+        <div class="cards-list"></div>
+      </div>
+      <div class="kanban-col" id="col-done">
+        <div class="col-title" style="color: var(--green);">Concluído <span class="tag" id="cnt-done">0</span></div>
+        <div class="cards-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 3: CHAT -->
+  <div class="view-container" id="view-chat">
+    <div class="chat-layout">
+      <div class="chat-agents-list">
+        <div class="chat-agent-item selected" onclick="selectChatAgent('executor')">
+          <div style="font-weight: 600;">EXECUTOR</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Orquestrador Geral</div>
+        </div>
+        <div class="chat-agent-item" onclick="selectChatAgent('research')">
+          <div style="font-weight: 600;">RESEARCH</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Pesquisador Imobiliário</div>
+        </div>
+        <div class="chat-agent-item" onclick="selectChatAgent('writer')">
+          <div style="font-weight: 600;">CONTENT WRITER</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Redator Padrão Vendo Casas</div>
+        </div>
+        <div class="chat-agent-item" onclick="selectChatAgent('developer')">
+          <div style="font-weight: 600;">DEVELOPER</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Engenheiro de Ferramentas</div>
+        </div>
+      </div>
+      <div class="chat-main">
+        <div class="chat-messages" id="chat-messages-container"></div>
+        <div class="chat-input-area">
+          <input type="text" class="chat-input" id="chat-input" placeholder="Envie uma instrução para o especialista selecionado..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+          <button class="btn" onclick="sendChatMessage()">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 4: DOCS -->
+  <div class="view-container" id="view-docs">
+    <div class="docs-list" id="docs-container">Carregando documentos...</div>
+  </div>
+
+  <!-- VIEW 5: TERMINAL -->
+  <div class="view-container" id="view-terminal">
+    <div class="terminal-box">
+      <div class="terminal-output" id="terminal-output">NEXORA 3.0 Real Shell [Host Conectado]
+Digite um comando abaixo (ex: hermes --version, uname -a, ls ~/.hermes)
+</div>
+      <div class="terminal-input-bar">
+        <span class="terminal-prompt">nexora@fleet:~$</span>
+        <input type="text" class="terminal-input" id="term-input" onkeydown="if(event.key==='Enter') runTerminalCommand()">
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+let currentAgent = 'executor';
+
+function switchView(viewName) {
+  document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  
+  const targetView = document.getElementById('view-' + viewName);
+  if (targetView) targetView.classList.add('active');
+
+  const titles = {
+    cockpit: 'Cockpit da Frota',
+    missions: 'Quadro de Missões (Kanban Real)',
+    chat: 'Chat com Especialistas',
+    docs: 'Biblioteca de Documentos',
+    terminal: 'Terminal Shell do Servidor'
+  };
+  document.getElementById('page-title').innerText = titles[viewName] || 'NEXORA 3.0';
+
+  const navs = document.querySelectorAll('.nav-item');
+  if (viewName === 'cockpit') navs[0].classList.add('active');
+  if (viewName === 'missions') navs[1].classList.add('active');
+  if (viewName === 'chat') navs[2].classList.add('active');
+  if (viewName === 'docs') navs[3].classList.add('active');
+  if (viewName === 'terminal') navs[4].classList.add('active');
+
+  if (viewName === 'missions') loadMissions();
+  if (viewName === 'chat') loadChatHistory();
+  if (viewName === 'docs') loadDocs();
+  if (viewName === 'cockpit') loadAgents();
+}
+
+async function loadAgents() {
+  try {
+    const res = await fetch('/api/agents');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const grid = document.getElementById('agents-grid');
+    grid.innerHTML = data.agents.map(a => `
+      <div class="card agent-card">
+        <div class="agent-header">
+          <div class="agent-avatar">${a.code || a.name.slice(0,2).toUpperCase()}</div>
+          <div>
+            <div class="agent-name">${a.name}</div>
+            <div class="agent-role">${a.role}</div>
+          </div>
+        </div>
+        <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 12px;">${a.description || 'Especialista ativo na frota.'}</div>
+        <div class="agent-stats">
+          <span>Modelo: <strong>${a.model}</strong></span>
+          <span>Status: <strong style="color: var(--green);">${a.status}</strong></span>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Falha ao carregar agentes', err);
+  }
+
+  // Health
+  try {
+    const hRes = await fetch('/api/health');
+    const hData = await hRes.json();
+    if (hData.ok) {
+      const sys = hData.system;
+      document.getElementById('health-stats').innerHTML = `
+        • CPU Load: ${sys.load['1m']} (1m) • ${sys.load['5m']} (5m)<br>
+        • Disco: ${sys.disk.used_gb} GB usados / ${sys.disk.total_gb} GB (${sys.disk.used_pct}%)<br>
+        • Memória: ${sys.memory.free} livres / ${sys.memory.total}
+      `;
+    }
+  } catch (e) {}
+}
+
+async function loadMissions() {
+  try {
+    const res = await fetch('/api/missions');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const cols = { backlog: [], approval_needed: [], in_progress: [], done: [] };
+    data.missions.forEach(m => {
+      if (cols[m.status]) cols[m.status].push(m);
+      else cols.backlog.push(m);
+    });
+
+    for (let st in cols) {
+      const container = document.querySelector(`#col-${st} .cards-list`);
+      if (!container) continue;
+      container.innerHTML = cols[st].map(m => `
+        <div class="mission-card">
+          <div class="mission-title">${m.title}</div>
+          <div class="mission-desc">${m.description || 'Sem descrição.'}</div>
+          <div class="mission-meta">
+            <span class="tag">${m.assigned_agent.toUpperCase()}</span>
+            ${st === 'approval_needed' ? `<button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="approveMission('${m.id}')">Aprovar</button>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {}
+}
+
+async function approveMission(id) {
+  await fetch('/api/missions/approve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id })
+  });
+  loadMissions();
+}
+
+function selectChatAgent(agent) {
+  currentAgent = agent;
+  document.querySelectorAll('.chat-agent-item').forEach(el => el.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  loadChatHistory();
+}
+
+async function loadChatHistory() {
+  const container = document.getElementById('chat-messages-container');
+  container.innerHTML = '<div style="color: var(--text-muted); font-size: 12px; text-align: center;">Carregando histórico...</div>';
+  try {
+    const res = await fetch('/api/chat?agent=' + currentAgent);
+    const data = await res.json();
+    if (!data.ok) return;
+    container.innerHTML = data.messages.map(m => `
+      <div class="bubble ${m.role === 'user' ? 'user' : 'agent'}">
+        <div style="font-size: 11px; opacity: 0.6; margin-bottom: 4px;">${m.role === 'user' ? 'Você' : currentAgent.toUpperCase()}</div>
+        ${m.text}
+      </div>
+    `).join('');
+    container.scrollTop = container.scrollHeight;
+  } catch (err) {}
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const container = document.getElementById('chat-messages-container');
+  container.innerHTML += `<div class="bubble user">${text}</div>`;
+  container.scrollTop = container.scrollHeight;
+
+  const thinkingId = 'think_' + Date.now();
+  container.innerHTML += `<div class="bubble agent" id="${thinkingId}"><em>${currentAgent.toUpperCase()} está processando...</em></div>`;
+  container.scrollTop = container.scrollHeight;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: currentAgent, text })
+    });
+    const data = await res.json();
+    document.getElementById(thinkingId).innerHTML = `
+      <div style="font-size: 11px; opacity: 0.6; margin-bottom: 4px;">${currentAgent.toUpperCase()} (${data.elapsed_ms}ms)</div>
+      ${data.reply}
+    `;
+    container.scrollTop = container.scrollHeight;
+  } catch (err) {
+    document.getElementById(thinkingId).innerText = 'Erro ao se comunicar com o agente.';
+  }
+}
+
+async function loadDocs() {
+  const container = document.getElementById('docs-container');
+  try {
+    const res = await fetch('/api/docs');
+    const data = await res.json();
+    if (!data.ok || !data.docs.length) {
+      container.innerHTML = '<div style="color: var(--text-muted); padding: 20px;">Nenhum documento gerado ainda em ~/nexora/data/docs/.</div>';
+      return;
+    }
+    container.innerHTML = data.docs.map(d => `
+      <div class="doc-item">
+        <div>
+          <div style="font-weight: 600;">${d.name}</div>
+          <div style="font-size: 12px; color: var(--text-muted);">${(d.size_bytes/1024).toFixed(1)} KB</div>
+        </div>
+        <button class="btn btn-outline" onclick="viewDocContent('${d.rel_path}')">Visualizar</button>
+      </div>
+    `).join('');
+  } catch (err) {}
+}
+
+async function viewDocContent(path) {
+  const res = await fetch('/api/docs/content?file=' + encodeURIComponent(path));
+  const data = await res.json();
+  if (data.ok) alert(data.content);
+}
+
+async function runTerminalCommand() {
+  const input = document.getElementById('term-input');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  input.value = '';
+
+  const out = document.getElementById('terminal-output');
+  out.innerText += '\n$ ' + cmd + '\n';
+  out.scrollTop = out.scrollHeight;
+
+  try {
+    const res = await fetch('/api/terminal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmd })
+    });
+    const data = await res.json();
+    out.innerText += (data.stdout || '') + (data.stderr || '');
+    out.scrollTop = out.scrollHeight;
+  } catch (e) {
+    out.innerText += 'Erro de execução: ' + e.message;
+  }
+}
+
+function openNewMissionModal() {
+  const title = prompt('Título da Nova Missão:');
+  if (!title) return;
+  const desc = prompt('Objetivo/Descrição detalhada:');
+  const agent = prompt('Especialista (executor, research, writer, developer):', 'executor');
+  
+  fetch('/api/missions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, description: desc, assigned_agent: agent, status: 'backlog' })
+  }).then(() => {
+    switchView('missions');
+  });
+}
+
+function loadAllData() {
+  loadAgents();
+}
+
+window.onload = () => {
+  loadAgents();
+};
+</script>
+</body>
+</html>
